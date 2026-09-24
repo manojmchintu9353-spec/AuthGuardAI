@@ -14,6 +14,40 @@ function getRiskLabel(score) {
   return "LOW RISK";
 }
 
+function playAlertSiren() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioContextClass();
+
+    const duration = 1.4;
+    const startTime = ctx.currentTime;
+
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
+    oscillator.type = "sawtooth";
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    gainNode.gain.setValueAtTime(0.0001, startTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.15, startTime + 0.05);
+
+    oscillator.frequency.setValueAtTime(600, startTime);
+    oscillator.frequency.linearRampToValueAtTime(900, startTime + 0.35);
+    oscillator.frequency.linearRampToValueAtTime(600, startTime + 0.7);
+    oscillator.frequency.linearRampToValueAtTime(900, startTime + 1.05);
+    oscillator.frequency.linearRampToValueAtTime(600, startTime + duration);
+
+    gainNode.gain.setValueAtTime(0.15, startTime + duration - 0.1);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+    oscillator.start(startTime);
+    oscillator.stop(startTime + duration);
+  } catch (err) {
+    console.log("Could not play alert sound:", err);
+  }
+}
+
 function Login({ onLoginSuccess }) {
   const [mode, setMode] = useState("login");
   const [name, setName] = useState("");
@@ -47,16 +81,28 @@ function Login({ onLoginSuccess }) {
       if (!res.ok) {
         setIsError(true);
         setMessage(data.message || "Something went wrong");
-        if (typeof data.riskScore === "number") {
-          setRiskScore(data.riskScore);
+
+        const effectiveRisk = typeof data.riskScore === "number" ? data.riskScore : null;
+        if (effectiveRisk !== null) {
+          setRiskScore(effectiveRisk);
         }
+
+        if (res.status === 423 || (effectiveRisk !== null && effectiveRisk >= 70)) {
+          playAlertSiren();
+        }
+
         return;
       }
 
       if (mode === "login") {
         localStorage.setItem("token", data.token);
         setMessage("Welcome, " + data.user.name + "!");
-        setRiskScore(0);
+        setRiskScore(typeof data.riskScore === "number" ? data.riskScore : 0);
+
+        if (typeof data.riskScore === "number" && data.riskScore >= 70) {
+          playAlertSiren();
+        }
+
         setTimeout(function () {
           onLoginSuccess(data.user);
         }, 600);
