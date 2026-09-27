@@ -41,6 +41,11 @@ const userSchema = new mongoose.Schema(
       default: []
     },
 
+    loginHours: {
+      type: [Number],
+      default: []
+    },
+
     lastLogin: {
       type: Date,
       default: null

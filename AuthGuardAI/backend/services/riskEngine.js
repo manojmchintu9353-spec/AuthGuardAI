@@ -2,7 +2,8 @@ function calculateRisk({
   failedAttempts,
   isNewDevice,
   isNewIP,
-  rapidAttempts
+  rapidAttempts,
+  isUnusualTime
 }) {
   let score = 0;
 
@@ -18,6 +19,10 @@ function calculateRisk({
 
   if (rapidAttempts) {
     score += 20;
+  }
+
+  if (isUnusualTime) {
+    score += 15;
   }
 
   if (score > 100) {
@@ -38,6 +43,28 @@ function calculateRisk({
   };
 }
 
+function detectUnusualLoginTime(loginHours, currentHour) {
+  if (!loginHours || loginHours.length < 3) {
+    return false;
+  }
+
+  const mean = loginHours.reduce(function (a, b) { return a + b; }, 0) / loginHours.length;
+
+  const variance = loginHours.reduce(function (sum, h) {
+    return sum + Math.pow(h - mean, 2);
+  }, 0) / loginHours.length;
+
+  const stdDev = Math.sqrt(variance);
+
+  let diff = Math.abs(currentHour - mean);
+  if (diff > 12) diff = 24 - diff;
+
+  const threshold = Math.max(stdDev * 2, 3);
+
+  return diff > threshold;
+}
+
 module.exports = {
-  calculateRisk
+  calculateRisk,
+  detectUnusualLoginTime
 };
