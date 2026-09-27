@@ -8,9 +8,9 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-async function sendSecurityAlert({ toEmail, subject, heading, message, riskScore }) {
+async function sendSecurityAlert({ toEmail, subject, heading, message, riskScore, imageBase64 }) {
   try {
-    await transporter.sendMail({
+    const mailOptions = {
       from: '"AuthGuardAI Security" <' + process.env.EMAIL_USER + '>',
       to: toEmail,
       subject: subject,
@@ -20,11 +20,25 @@ async function sendSecurityAlert({ toEmail, subject, heading, message, riskScore
         '<h3>' + heading + '</h3>' +
         '<p>' + message + '</p>' +
         '<p><strong>Risk Score:</strong> ' + riskScore + '</p>' +
+        (imageBase64 ? '<p><strong>Captured image of the attempted access is attached.</strong></p>' : '') +
         '<p style="color: #6b7280; font-size: 12px; margin-top: 30px;">' +
         'If this was not you, we recommend changing your password immediately.' +
         '</p>' +
         '</div>'
-    });
+    };
+
+    if (imageBase64) {
+      const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+      mailOptions.attachments = [
+        {
+          filename: "intruder-capture.jpg",
+          content: base64Data,
+          encoding: "base64"
+        }
+      ];
+    }
+
+    await transporter.sendMail(mailOptions);
     console.log("Security alert email sent to " + toEmail);
   } catch (error) {
     console.error("EMAIL SEND ERROR:", error.message);

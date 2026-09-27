@@ -321,4 +321,40 @@ router.get("/security-events", async (req, res) => {
 });
 
 
+// =========================
+// REPORT INTRUDER (webcam capture on lockout)
+// =========================
+router.post("/report-intruder", async (req, res) => {
+  try {
+    const { email, imageBase64 } = req.body;
+
+    if (!email || !imageBase64) {
+      return res.status(400).json({ message: "Email and image are required" });
+    }
+
+    const normalizedEmail = email.toLowerCase();
+
+    const user = await User.findOne({ email: normalizedEmail });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    await sendSecurityAlert({
+      toEmail: user.email,
+      subject: "AuthGuardAI: Intruder Snapshot Captured",
+      heading: "A photo was captured during a locked-out login attempt",
+      message: "Your account was locked after 3 failed attempts. A snapshot was taken at the moment of the attempt for your review.",
+      riskScore: 100,
+      imageBase64: imageBase64
+    });
+
+    res.json({ message: "Snapshot sent" });
+
+  } catch (error) {
+    console.error("INTRUDER REPORT ERROR:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
 module.exports = router;

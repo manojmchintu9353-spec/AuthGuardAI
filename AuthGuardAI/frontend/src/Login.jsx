@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 const API_BASE = "http://localhost:5000/api/auth";
 
@@ -48,6 +48,48 @@ function playAlertSiren() {
   }
 }
 
+function captureAndReportIntruder(email) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    console.log("Camera not available in this browser");
+    return;
+  }
+
+  navigator.mediaDevices
+    .getUserMedia({ video: true })
+    .then(function (stream) {
+      const video = document.createElement("video");
+      video.srcObject = stream;
+      video.play();
+
+      video.onloadedmetadata = function () {
+        setTimeout(function () {
+          const canvas = document.createElement("canvas");
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+          const imageBase64 = canvas.toDataURL("image/jpeg", 0.8);
+
+          stream.getTracks().forEach(function (track) {
+            track.stop();
+          });
+
+          fetch(API_BASE + "/report-intruder", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: email, imageBase64: imageBase64 })
+          }).catch(function (err) {
+            console.log("Could not send intruder snapshot:", err);
+          });
+        }, 500);
+      };
+    })
+    .catch(function (err) {
+      console.log("Camera permission denied or unavailable:", err);
+    });
+}
+
 function Login({ onLoginSuccess }) {
   const [mode, setMode] = useState("login");
   const [name, setName] = useState("");
@@ -87,7 +129,10 @@ function Login({ onLoginSuccess }) {
           setRiskScore(effectiveRisk);
         }
 
-        if (res.status === 423 || (effectiveRisk !== null && effectiveRisk >= 70)) {
+        if (res.status === 423) {
+          playAlertSiren();
+          captureAndReportIntruder(email);
+        } else if (effectiveRisk !== null && effectiveRisk >= 70) {
           playAlertSiren();
         }
 
